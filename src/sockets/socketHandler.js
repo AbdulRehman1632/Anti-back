@@ -13,10 +13,24 @@ const onlineUsers = new Map();
 const activeCalls = new Map();
 
 export const initSocket = (httpServer) => {
+  const clientUrl = process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/\/+$/, '') : null;
+
   io = new Server(httpServer, {
     cors: {
-      origin: '*',
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (
+          !clientUrl ||
+          origin === clientUrl ||
+          origin.startsWith('http://localhost') ||
+          origin.endsWith('.vercel.app')
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, origin);
+      },
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      credentials: true,
     },
     transports: ['websocket', 'polling'],
   });

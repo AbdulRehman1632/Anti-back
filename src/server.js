@@ -19,20 +19,31 @@ dotenv.config();
 const app = express();
 const httpServer = http.createServer(app);
 
-// Initialize real-time Socket.IO & WebRTC signaling
 initSocket(httpServer);
 
-// Global middleware
+const clientUrl = process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/\/+$/, '') : null;
+
 app.use(
   cors({
-    origin: '*',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Postman, server-to-server)
+      if (!origin) return callback(null, true);
+      if (
+        !clientUrl ||
+        origin === clientUrl ||
+        origin.startsWith('http://localhost') ||
+        origin.endsWith('.vercel.app')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, origin);
+    },
     credentials: true,
   })
 );
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health / Status endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -45,7 +56,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Mount API Routes
+
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/workspace', workspaceRoutes);
@@ -55,7 +66,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/custom-fields', customFieldRoutes);
 app.use('/api/lifecycle-stages', lifecycleRoutes);
 
-// Fallback error handler
+
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);
   res.status(err.status || 500).json({
