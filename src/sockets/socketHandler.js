@@ -163,6 +163,68 @@ export const initSocket = (httpServer) => {
       }
     });
 
+    // ── Call Initiation, Ringing & Invitation Signaling ──
+    socket.on('call:initiate', ({ caller, targetUserId, channelId, channelName, callType = 'video' }) => {
+      const callId = 'call-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+      console.log(`📞 Ringing user: ${targetUserId} from ${caller?.name} (${callType})`);
+      io.to(`user:${targetUserId}`).emit('call:incoming', {
+        callId,
+        caller,
+        targetUserId,
+        channelId,
+        channelName: channelName || (caller?.name ? `${caller.name}` : 'Direct Call'),
+        callType,
+        isDirect: true,
+        callerSocketId: socket.id,
+      });
+    });
+
+    socket.on('call:initiate_channel', ({ caller, channelId, channelName, callType = 'video' }) => {
+      const callId = 'call-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+      console.log(`📢 Conference Ring for channel: ${channelName} by ${caller?.name}`);
+      socket.broadcast.emit('call:incoming', {
+        callId,
+        caller,
+        channelId,
+        channelName: channelName || 'Conference Call',
+        callType,
+        isDirect: false,
+        callerSocketId: socket.id,
+      });
+    });
+
+    socket.on('call:accept', ({ callId, callerSocketId, channelId, channelName, responder, callType = 'video' }) => {
+      if (callerSocketId) {
+        io.to(callerSocketId).emit('call:accepted', {
+          callId,
+          channelId,
+          channelName,
+          responder,
+          callType,
+          responderSocketId: socket.id,
+        });
+      }
+    });
+
+    socket.on('call:decline', ({ callId, callerSocketId, reason, responder }) => {
+      if (callerSocketId) {
+        io.to(callerSocketId).emit('call:declined', {
+          callId,
+          reason: reason || 'Call declined',
+          responder,
+          responderSocketId: socket.id,
+        });
+      }
+    });
+
+    socket.on('call:cancel', ({ targetUserId, channelId }) => {
+      if (targetUserId) {
+        io.to(`user:${targetUserId}`).emit('call:cancelled', { channelId });
+      } else {
+        io.emit('call:cancelled', { channelId });
+      }
+    });
+
     // WebRTC Real-Time Calling Signaling
     socket.on('call:join', ({ channelId, user, isAudioMuted = false, isVideoOff = false }) => {
       if (!channelId || !user) return;

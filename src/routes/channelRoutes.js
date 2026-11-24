@@ -15,8 +15,8 @@ router.use(protect);
 
 router.get('/', getChannels);
 router.get('/:id', getChannelById);
-router.post('/', requireRole('Owner', 'Admin'), createChannel);
-router.put('/:id', requireRole('Owner', 'Admin'), updateChannel);
+router.post('/', requireRole('Owner', 'Admin', 'Editor'), createChannel);
+router.put('/:id', requireRole('Owner', 'Admin', 'Editor'), updateChannel);
 router.delete('/:id', requireRole('Owner', 'Admin'), deleteChannel);
 
 export default router;
