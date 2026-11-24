@@ -9,27 +9,42 @@ import { defaultUsers } from '../data/seedData.js';
 dotenv.config();
 
 export let isMongoConnected = false;
+let connectingPromise = null;
 
 export const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/devdrip_crm';
-  try {
-    const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 8000,
-      connectTimeoutMS: 8000,
-    });
-    // Ping database to verify live connectivity
-    await conn.connection.db.admin().ping();
-    isMongoConnected = true;
-    console.log(` MongoDB Connected successfully to: ${conn.connection.host}/${conn.connection.name}`);
-    await initializeDefaultNavigation();
-    await seedDefaultUsersIfMissing();
-  } catch (error) {
-    isMongoConnected = false;
-    try {
-      await mongoose.disconnect();
-    } catch (e) {}
-    console.warn(`⚠️  MongoDB not reachable (${error.message}). Running with in-memory persistence store.`);
+  if (isMongoConnected && mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
+  if (connectingPromise) {
+    return connectingPromise;
+  }
+
+  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/devdrip_crm';
+  connectingPromise = (async () => {
+    try {
+      const conn = await mongoose.connect(uri, {
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
+      });
+      // Ping database to verify live connectivity
+      await conn.connection.db.admin().ping();
+      isMongoConnected = true;
+      console.log(` MongoDB Connected successfully to: ${conn.connection.host}/${conn.connection.name}`);
+      await initializeDefaultNavigation();
+      await seedDefaultUsersIfMissing();
+      return conn;
+    } catch (error) {
+      isMongoConnected = false;
+      try {
+        await mongoose.disconnect();
+      } catch (e) {}
+      console.warn(`⚠️  MongoDB not reachable (${error.message}). Running with in-memory persistence store.`);
+    } finally {
+      connectingPromise = null;
+    }
+  })();
+
+  return connectingPromise;
 };
 
 export async function seedDefaultUsersIfMissing() {

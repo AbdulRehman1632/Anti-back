@@ -142,27 +142,29 @@ export const register = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    let userData;
-    if (isMongoConnected) {
-      const dbUser = await User.findById(req.user._id).select('-password');
-      if (!dbUser) {
-        return res.status(404).json({ success: false, message: 'User not found.' });
+    let userData = req.user;
+    if (userData && typeof userData.toObject === 'function') {
+      userData = userData.toObject();
+    }
+    if (!userData && req.user?._id) {
+      if (isMongoConnected) {
+        const dbUser = await User.findById(req.user._id).select('-password');
+        if (dbUser) userData = dbUser.toObject();
+      } else {
+        userData = store.findUserById(req.user._id);
       }
-      userData = dbUser.toObject();
-    } else {
-      userData = store.findUserById(req.user._id);
-      if (!userData) {
-        return res.status(404).json({ success: false, message: 'User not found.' });
-      }
-      const { password, ...safeUser } = userData;
-      userData = safeUser;
     }
 
+    if (!userData) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const { password, ...safeUser } = userData;
     res.json({
       success: true,
       user: {
-        ...userData,
-        organizationName: userData.organizationName || 'Devdrip CRM',
+        ...safeUser,
+        organizationName: safeUser.organizationName || 'Devdrip CRM',
       },
     });
   } catch (err) {

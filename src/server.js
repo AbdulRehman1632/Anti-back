@@ -44,6 +44,16 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Ensure DB connectivity for serverless cold starts
+app.use(async (req, res, next) => {
+  if (!isMongoConnected) {
+    try {
+      await connectDB();
+    } catch (e) {}
+  }
+  next();
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
