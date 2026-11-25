@@ -85,10 +85,9 @@ export const createCredentials = async (req, res) => {
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
       });
 
-      await Workspace.findOneAndUpdate(
+      await Workspace.updateOne(
         {},
-        { $push: { members: { user: newUser._id, role, joinedAt: new Date() } } },
-        { upsert: true, new: true }
+        { $push: { members: { user: newUser._id, role, joinedAt: new Date() } } }
       );
     } else {
       const hashedPassword = await bcrypt.hash(password, 10);

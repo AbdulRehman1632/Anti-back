@@ -1,8 +1,7 @@
-import mongoose from 'mongoose';
 import { verifyToken } from '../config/jwt.js';
 import User from '../models/User.js';
 import store from '../storage/mockStore.js';
-import { connectDB, isMongoConnected } from '../config/db.js';
+import { isMongoConnected } from '../config/db.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -20,38 +19,18 @@ export const protect = async (req, res, next) => {
 
   try {
     const decoded = verifyToken(token);
-    if (!decoded || (!decoded.id && !decoded.email)) {
+    if (!decoded || !decoded.id) {
       return res.status(401).json({
         success: false,
         message: 'Invalid or expired token',
       });
     }
 
-    // Ensure database connection is ready
-    if (!isMongoConnected) {
-      try {
-        await connectDB();
-      } catch (e) {}
-    }
-
-    let user = null;
-
+    let user;
     if (isMongoConnected) {
-      // 1. Primary lookup by MongoDB _id (if valid ObjectId format)
-      if (decoded.id && mongoose.Types.ObjectId.isValid(decoded.id)) {
-        user = await User.findById(decoded.id).select('-password');
-      }
-
-      // 2. Fallback lookup by email (resolves tokens issued across restarts, seeds, or stores)
-      if (!user && decoded.email) {
-        user = await User.findOne({ email: decoded.email.toLowerCase() }).select('-password');
-      }
-    }
-
-    // 3. Fallback lookup in in-memory store
-    if (!user) {
-      user = (decoded.id ? store.findUserById(decoded.id) : null) ||
-        (decoded.email ? store.findUserByEmail(decoded.email) : null);
+      user = await User.findById(decoded.id).select('-password');
+    } else {
+      user = store.findUserById(decoded.id);
     }
 
     if (!user) {

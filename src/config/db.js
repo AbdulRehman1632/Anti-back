@@ -1,79 +1,32 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import bcrypt from 'bcryptjs';
 import SidebarSection from '../models/SidebarSection.js';
 import SidebarTab from '../models/SidebarTab.js';
-import User from '../models/User.js';
-import { defaultUsers } from '../data/seedData.js';
 
 dotenv.config();
 
 export let isMongoConnected = false;
-let connectingPromise = null;
 
 export const connectDB = async () => {
-  if (isMongoConnected && mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-  if (connectingPromise) {
-    return connectingPromise;
-  }
-
   const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/devdrip_crm';
-  connectingPromise = (async () => {
-    try {
-      const conn = await mongoose.connect(uri, {
-        serverSelectionTimeoutMS: 10000,
-        connectTimeoutMS: 10000,
-      });
-      // Ping database to verify live connectivity
-      await conn.connection.db.admin().ping();
-      isMongoConnected = true;
-      console.log(` MongoDB Connected successfully to: ${conn.connection.host}/${conn.connection.name}`);
-      await initializeDefaultNavigation();
-      await seedDefaultUsersIfMissing();
-      return conn;
-    } catch (error) {
-      isMongoConnected = false;
-      try {
-        await mongoose.disconnect();
-      } catch (e) {}
-      console.warn(`⚠️  MongoDB not reachable (${error.message}). Running with in-memory persistence store.`);
-    } finally {
-      connectingPromise = null;
-    }
-  })();
-
-  return connectingPromise;
-};
-
-export async function seedDefaultUsersIfMissing() {
   try {
-    const salt = await bcrypt.genSalt(10);
-    const defaultHashedPassword = await bcrypt.hash('password123', salt);
-
-    for (const defUser of defaultUsers) {
-      const existing = await User.findOne({ email: defUser.email.toLowerCase() });
-      if (!existing) {
-        await User.create({
-          name: defUser.name,
-          email: defUser.email.toLowerCase(),
-          password: defaultHashedPassword,
-          role: defUser.role,
-          status: defUser.status || 'online',
-          statusMessage: defUser.statusMessage || 'Available',
-          avatar: defUser.avatar || '',
-          department: defUser.department || 'Operations',
-          title: defUser.title || 'Team Member',
-          organizationName: defUser.organizationName || 'Devdrip CRM',
-        });
-        console.log(`🌱 Auto-seeded default user: ${defUser.email}`);
-      }
-    }
-  } catch (err) {
-    console.warn('⚠️ Notice during user auto-seed:', err.message);
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 2000,
+      connectTimeoutMS: 2000,
+    });
+    // Ping database to verify live connectivity
+    await conn.connection.db.admin().ping();
+    isMongoConnected = true;
+    console.log(` MongoDB Connected successfully to: ${conn.connection.host}/${conn.connection.name}`);
+    await initializeDefaultNavigation();
+  } catch (error) {
+    isMongoConnected = false;
+    try {
+      await mongoose.disconnect();
+    } catch (e) {}
+    console.warn(`⚠️  MongoDB not reachable (${error.message}). Running with in-memory persistence store.`);
   }
-}
+};
 
 export async function initializeDefaultNavigation() {
   try {

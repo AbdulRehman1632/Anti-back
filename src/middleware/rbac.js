@@ -32,7 +32,6 @@ export const ROLE_PERMISSIONS = {
     'CALL_JOIN',
   ],
   Editor: [
-    'CHANNEL_CREATE',
     'CHANNEL_VIEW',
     'TASK_CREATE',
     'TASK_UPDATE',
