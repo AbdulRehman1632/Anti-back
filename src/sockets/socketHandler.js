@@ -13,10 +13,24 @@ const onlineUsers = new Map();
 const activeCalls = new Map();
 
 export const initSocket = (httpServer) => {
+  const clientUrl = process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/\/+$/, '') : null;
+
   io = new Server(httpServer, {
     cors: {
-      origin: '*',
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (
+          !clientUrl ||
+          origin === clientUrl ||
+          origin.startsWith('http://localhost') ||
+          origin.endsWith('.vercel.app')
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, origin);
+      },
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      credentials: true,
     },
     transports: ['websocket', 'polling'],
   });
@@ -146,6 +160,68 @@ export const initSocket = (httpServer) => {
           user,
           isTyping: false,
         });
+      }
+    });
+
+    // ── Call Initiation, Ringing & Invitation Signaling ──
+    socket.on('call:initiate', ({ caller, targetUserId, channelId, channelName, callType = 'video' }) => {
+      const callId = 'call-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+      console.log(`📞 Ringing user: ${targetUserId} from ${caller?.name} (${callType})`);
+      io.to(`user:${targetUserId}`).emit('call:incoming', {
+        callId,
+        caller,
+        targetUserId,
+        channelId,
+        channelName: channelName || (caller?.name ? `${caller.name}` : 'Direct Call'),
+        callType,
+        isDirect: true,
+        callerSocketId: socket.id,
+      });
+    });
+
+    socket.on('call:initiate_channel', ({ caller, channelId, channelName, callType = 'video' }) => {
+      const callId = 'call-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+      console.log(`📢 Conference Ring for channel: ${channelName} by ${caller?.name}`);
+      socket.broadcast.emit('call:incoming', {
+        callId,
+        caller,
+        channelId,
+        channelName: channelName || 'Conference Call',
+        callType,
+        isDirect: false,
+        callerSocketId: socket.id,
+      });
+    });
+
+    socket.on('call:accept', ({ callId, callerSocketId, channelId, channelName, responder, callType = 'video' }) => {
+      if (callerSocketId) {
+        io.to(callerSocketId).emit('call:accepted', {
+          callId,
+          channelId,
+          channelName,
+          responder,
+          callType,
+          responderSocketId: socket.id,
+        });
+      }
+    });
+
+    socket.on('call:decline', ({ callId, callerSocketId, reason, responder }) => {
+      if (callerSocketId) {
+        io.to(callerSocketId).emit('call:declined', {
+          callId,
+          reason: reason || 'Call declined',
+          responder,
+          responderSocketId: socket.id,
+        });
+      }
+    });
+
+    socket.on('call:cancel', ({ targetUserId, channelId }) => {
+      if (targetUserId) {
+        io.to(`user:${targetUserId}`).emit('call:cancelled', { channelId });
+      } else {
+        io.emit('call:cancelled', { channelId });
       }
     });
 

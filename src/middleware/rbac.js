@@ -32,18 +32,24 @@ export const ROLE_PERMISSIONS = {
     'CALL_JOIN',
   ],
   Editor: [
+    'USER_INVITE',
+    'CHANNEL_CREATE',
     'CHANNEL_VIEW',
     'TASK_CREATE',
     'TASK_UPDATE',
     'TASK_DELETE',
     'TASK_VIEW',
     'COMMENT_POST',
+    'CALL_HOST',
     'CALL_JOIN',
   ],
   Viewer: [
+    'CHANNEL_CREATE',
     'CHANNEL_VIEW',
     'TASK_VIEW',
-    'CALL_JOIN_LISTEN_ONLY',
+    'COMMENT_POST',
+    'CALL_HOST',
+    'CALL_JOIN',
   ],
 };
 

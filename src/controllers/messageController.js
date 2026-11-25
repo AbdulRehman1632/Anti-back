@@ -146,3 +146,39 @@ export const addReaction = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const getRecentMessages = async (req, res) => {
+  try {
+    const since = req.query.since ? new Date(req.query.since) : new Date(Date.now() - 45000);
+    let messages = [];
+
+    if (isMongoConnected) {
+      messages = await Message.find({
+        createdAt: { $gte: since },
+        sender: { $ne: req.user._id },
+        $or: [
+          { recipient: req.user._id },
+          { channel: { $ne: null } },
+        ],
+      })
+        .populate('sender', 'name email avatar role status')
+        .sort({ createdAt: -1 })
+        .limit(15);
+    } else {
+      messages = store.messages
+        .filter(
+          (m) =>
+            new Date(m.createdAt) >= since &&
+            m.sender !== req.user._id &&
+            (m.recipient === req.user._id || m.channel)
+        )
+        .map((m) => ({ ...m, sender: store.findUserById(m.sender) }))
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 15);
+    }
+
+    res.json({ success: true, count: messages.length, messages });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
